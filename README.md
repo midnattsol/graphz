@@ -37,10 +37,6 @@ zig build test      # run tests
 zig build run       # run the CLI
 ```
 
-## CI
-
-CI installs and runs Zig `0.16.0` explicitly in Woodpecker.
-
 ## Requirements
 
 Zig 0.16.0
