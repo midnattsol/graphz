@@ -73,8 +73,6 @@
     .paths = .{
         "build.zig",
         "build.zig.zon",
-        "flake.nix",
-        ".woodpecker.yml",
         "README.md",
         "src",
     },
