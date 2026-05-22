@@ -1,8 +1,0 @@
-steps:
-  test:
-    image: alpine:3.20
-    commands:
-      - apk add --no-cache curl xz
-      - curl -L https://ziglang.org/download/0.16.0/zig-linux-x86_64-0.16.0.tar.xz -o zig.tar.xz
-      - tar -xf zig.tar.xz
-      - ./zig-linux-x86_64-0.16.0/zig build test
