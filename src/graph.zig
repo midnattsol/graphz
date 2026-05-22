@@ -47,7 +47,20 @@ pub fn StaticGraph(comptime T: type, comptime W: type) type {
             allocator.free(self.node_ids);
         }
 
+        /// Returns the node data for the given node id.
+        pub fn getNode(self: Self, node: NodeId) T {
+            return self.nodes[node.index];
+        }
+
+        /// Returns true if `node` is a valid node identifier in this graph.
+        /// All other accessors assume a valid NodeId; validate first when
+        /// receiving ids from untrusted sources.
+        pub fn hasNode(self: Self, node: NodeId) bool {
+            return node.index < self.nodes.len;
+        }
+
         /// Returns a slice of outgoing neighbor `NodeId`s for the given node.
+        /// Assumes `node` is valid; use `hasNode` to check first if needed.
         pub fn neighbors(self: Self, node: NodeId) []NodeId {
             const start = self.offsets[node.index];
             const end = self.offsets[node.index + 1];
@@ -56,6 +69,7 @@ pub fn StaticGraph(comptime T: type, comptime W: type) type {
 
         /// Returns a slice of weights for the outgoing edges of the given node.
         /// The slice has the same length as `neighbors(node)`.
+        /// Assumes `node` is valid.
         pub fn weightsForNode(self: Self, node: NodeId) []W {
             const start = self.offsets[node.index];
             const end = self.offsets[node.index + 1];
@@ -78,11 +92,13 @@ pub fn StaticGraph(comptime T: type, comptime W: type) type {
         }
 
         /// Returns the number of outgoing edges for the given node.
+        /// Assumes `node` is valid.
         pub fn outDegree(self: Self, node: NodeId) usize {
             return self.offsets[node.index + 1] - self.offsets[node.index];
         }
 
         /// Returns a slice of incoming neighbor `NodeId`s for the given node.
+        /// Assumes `node` is valid.
         pub fn inNeighbors(self: Self, node: NodeId) []NodeId {
             const start = self.rev_offsets[node.index];
             const end = self.rev_offsets[node.index + 1];
@@ -90,6 +106,7 @@ pub fn StaticGraph(comptime T: type, comptime W: type) type {
         }
 
         /// Returns the number of incoming edges for the given node.
+        /// Assumes `node` is valid.
         pub fn inDegree(self: Self, node: NodeId) usize {
             return self.rev_offsets[node.index + 1] - self.rev_offsets[node.index];
         }
@@ -130,6 +147,11 @@ pub fn GraphBuilder(comptime T: type, comptime W: type) type {
 
         pub fn hasNode(self: *const Self, id: NodeId) bool {
             return id.index < self.nodes.items.len;
+        }
+
+        /// Returns the node data associated with `id`, or null if `id` is invalid.
+        pub fn getNode(self: *const Self, id: NodeId) ?T {
+            return if (self.hasNode(id)) self.nodes.items[id.index] else null;
         }
 
         /// Adds a directed edge from `from` to `to` with given `weight`.
@@ -252,6 +274,38 @@ pub fn GraphBuilder(comptime T: type, comptime W: type) type {
 }
 
 // ==================== Tests ====================
+
+test "builder getNode" {
+    const Node = struct { name: []const u8 };
+    var builder = GraphBuilder(Node, void).init(std.testing.allocator);
+    defer builder.deinit();
+
+    const a = try builder.addNode(.{ .name = "A" });
+    const b = try builder.addNode(.{ .name = "B" });
+
+    try std.testing.expectEqualStrings("A", builder.getNode(a).?.name);
+    try std.testing.expectEqualStrings("B", builder.getNode(b).?.name);
+    try std.testing.expectEqual(@as(@TypeOf(builder.getNode(a)), null), builder.getNode(NodeId{ .index = 999 }));
+}
+
+test "static graph hasNode and getNode" {
+    const Node = struct { value: i32 };
+    var builder = GraphBuilder(Node, void).init(std.testing.allocator);
+    defer builder.deinit();
+
+    const n0 = try builder.addNode(.{ .value = 10 });
+    const n1 = try builder.addNode(.{ .value = 20 });
+
+    var graph = try builder.freeze(std.testing.allocator);
+    defer graph.deinit(std.testing.allocator);
+
+    try std.testing.expect(graph.hasNode(n0));
+    try std.testing.expect(graph.hasNode(n1));
+    try std.testing.expect(!graph.hasNode(NodeId{ .index = 2 }));
+
+    try std.testing.expectEqual(@as(i32, 10), graph.getNode(n0).value);
+    try std.testing.expectEqual(@as(i32, 20), graph.getNode(n1).value);
+}
 
 test "builder can add edges (unweighted)" {
     const Node = struct { name: []const u8 };

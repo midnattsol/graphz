@@ -10,6 +10,8 @@ pub fn bfs(g: anytype, start: graph.NodeId, allocator: std.mem.Allocator) ![]gra
     }
 
     const node_count = g.nodeCount();
+    if (start.index >= node_count) return error.InvalidNode;
+
     var visited = try allocator.alloc(bool, node_count);
     defer allocator.free(visited);
     @memset(visited, false);
@@ -135,4 +137,17 @@ test "bfs on unconnected graph visits only reachable component" {
 
     try std.testing.expectEqual(@as(usize, 2), order.len);
     try std.testing.expect(order[0].index == n0.index and order[1].index == n1.index);
+}
+
+test "bfs returns error on invalid start node" {
+    const Node = struct { id: u32 };
+    var builder = graph.GraphBuilder(Node, void).init(std.testing.allocator);
+    defer builder.deinit();
+
+    _ = try builder.addNode(.{ .id = 0 });
+
+    var g = try builder.freeze(std.testing.allocator);
+    defer g.deinit(std.testing.allocator);
+
+    try std.testing.expectError(error.InvalidNode, bfs(g, graph.NodeId{ .index = 1 }, std.testing.allocator));
 }

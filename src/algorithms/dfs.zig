@@ -14,6 +14,8 @@ pub fn dfs(g: anytype, start: graph.NodeId, allocator: std.mem.Allocator) ![]gra
     }
 
     const node_count = g.nodeCount();
+    if (start.index >= node_count) return error.InvalidNode;
+
     var visited = try allocator.alloc(bool, node_count);
     defer allocator.free(visited);
     @memset(visited, false);
@@ -133,4 +135,17 @@ test "dfs on a graph with a cycle still terminates" {
     defer found.deinit();
     for (order) |node| try found.put(node.index, {});
     try std.testing.expectEqual(@as(usize, 3), found.count());
+}
+
+test "dfs returns error on invalid start node" {
+    const Node = struct { id: u32 };
+    var builder = graph.GraphBuilder(Node, void).init(std.testing.allocator);
+    defer builder.deinit();
+
+    _ = try builder.addNode(.{ .id = 0 });
+
+    var g = try builder.freeze(std.testing.allocator);
+    defer g.deinit(std.testing.allocator);
+
+    try std.testing.expectError(error.InvalidNode, dfs(g, graph.NodeId{ .index = 1 }, std.testing.allocator));
 }
