@@ -1,27 +1,21 @@
 const std = @import("std");
 const graph = @import("../graph.zig");
+const utils = @import("../utils.zig");
 
 pub fn bfs(g: anytype, start: graph.NodeId, allocator: std.mem.Allocator) ![]graph.NodeId {
-    comptime {
-        if (!@hasDecl(@TypeOf(g), "neighbors"))
-            @compileError("Graph must have fn neighbors(self, NodeId) []NodeId");
-        if (!@hasDecl(@TypeOf(g), "nodeCount"))
-            @compileError("Graph must have fn nodeCount(self) usize");
-    }
+    comptime utils.requireNeighborsAndNodeCount(@TypeOf(g));
+    try utils.validateNode(g, start);
 
     const node_count = g.nodeCount();
-    if (start.index >= node_count) return error.InvalidNode;
+    var visited = try std.DynamicBitSetUnmanaged.initEmpty(allocator, node_count);
+    defer visited.deinit(allocator);
 
-    var visited = try allocator.alloc(bool, node_count);
-    defer allocator.free(visited);
-    @memset(visited, false);
-
-    var queue: std.ArrayList(graph.NodeId) = .empty;
+    var queue = try std.ArrayList(graph.NodeId).initCapacity(allocator, node_count);
     defer queue.deinit(allocator);
     var order: std.ArrayList(graph.NodeId) = .empty;
     errdefer order.deinit(allocator);
 
-    visited[start.index] = true;
+    visited.set(start.index);
     try queue.append(allocator, start);
     try order.append(allocator, start);
 
@@ -30,8 +24,8 @@ pub fn bfs(g: anytype, start: graph.NodeId, allocator: std.mem.Allocator) ![]gra
         const current = queue.items[head];
         head += 1;
         for (g.neighbors(current)) |v| {
-            if (!visited[v.index]) {
-                visited[v.index] = true;
+            if (!visited.isSet(v.index)) {
+                visited.set(v.index);
                 try queue.append(allocator, v);
                 try order.append(allocator, v);
             }
@@ -42,112 +36,54 @@ pub fn bfs(g: anytype, start: graph.NodeId, allocator: std.mem.Allocator) ![]gra
 
 // ==================== Tests ====================
 
+fn idxOf(order: []const graph.NodeId, target: usize) usize {
+    for (order, 0..) |n, i| if (n.index == target) return i;
+    unreachable;
+}
+
 test "bfs order on a simple graph" {
-    const Node = struct { id: u32 };
-    var builder = graph.GraphBuilder(Node, void).init(std.testing.allocator);
-    defer builder.deinit();
-
-    const n0 = try builder.addNode(.{ .id = 0 });
-    const n1 = try builder.addNode(.{ .id = 1 });
-    const n2 = try builder.addNode(.{ .id = 2 });
-    const n3 = try builder.addNode(.{ .id = 3 });
-    const n4 = try builder.addNode(.{ .id = 4 });
-
-    // Graph: 0->1, 0->2, 1->3, 2->4
-    try builder.addEdge(n0, n1, {});
-    try builder.addEdge(n0, n2, {});
-    try builder.addEdge(n1, n3, {});
-    try builder.addEdge(n2, n4, {});
-
-    var g = try builder.freeze(std.testing.allocator);
+    var g = try utils.buildTestGraph(std.testing.allocator, 5, &.{
+        .{ 0, 1 }, .{ 0, 2 }, .{ 1, 3 }, .{ 2, 4 },
+    });
     defer g.deinit(std.testing.allocator);
 
-    const order = try bfs(g, n0, std.testing.allocator);
+    const order = try bfs(g, .{ .index = 0 }, std.testing.allocator);
     defer std.testing.allocator.free(order);
 
-    try std.testing.expectEqual(n0.index, order[0].index);
-    var idx_n1: ?usize = null;
-    var idx_n2: ?usize = null;
-    var idx_n3: ?usize = null;
-    var idx_n4: ?usize = null;
-    for (order, 0..) |node, i| {
-        if (node.index == n1.index) idx_n1 = i;
-        if (node.index == n2.index) idx_n2 = i;
-        if (node.index == n3.index) idx_n3 = i;
-        if (node.index == n4.index) idx_n4 = i;
-    }
-    try std.testing.expect(idx_n1.? < idx_n3.?);
-    try std.testing.expect(idx_n2.? < idx_n4.?);
+    try std.testing.expectEqual(@as(usize, 0), order[0].index);
+    try std.testing.expect(idxOf(order, 1) < idxOf(order, 3));
+    try std.testing.expect(idxOf(order, 2) < idxOf(order, 4));
 }
 
 test "bfs distances" {
-    const Node = struct { id: u32 };
-    var builder = graph.GraphBuilder(Node, void).init(std.testing.allocator);
-    defer builder.deinit();
-
-    const n0 = try builder.addNode(.{ .id = 0 });
-    const n1 = try builder.addNode(.{ .id = 1 });
-    const n2 = try builder.addNode(.{ .id = 2 });
-    const n3 = try builder.addNode(.{ .id = 3 });
-
-    // 0 -> 1, 0 -> 2, 1 -> 2, 2 -> 3
-    try builder.addEdge(n0, n1, {});
-    try builder.addEdge(n0, n2, {});
-    try builder.addEdge(n1, n2, {});
-    try builder.addEdge(n2, n3, {});
-
-    var g = try builder.freeze(std.testing.allocator);
+    var g = try utils.buildTestGraph(std.testing.allocator, 4, &.{
+        .{ 0, 1 }, .{ 0, 2 }, .{ 1, 2 }, .{ 2, 3 },
+    });
     defer g.deinit(std.testing.allocator);
 
-    const order = try bfs(g, n0, std.testing.allocator);
+    const order = try bfs(g, .{ .index = 0 }, std.testing.allocator);
     defer std.testing.allocator.free(order);
 
-    var idx_n1: ?usize = null;
-    var idx_n2: ?usize = null;
-    var idx_n3: ?usize = null;
-    for (order, 0..) |node, i| {
-        if (node.index == n1.index) idx_n1 = i;
-        if (node.index == n2.index) idx_n2 = i;
-        if (node.index == n3.index) idx_n3 = i;
-    }
-    try std.testing.expect(idx_n1.? < idx_n3.?);
-    try std.testing.expect(idx_n2.? < idx_n3.?);
+    try std.testing.expect(idxOf(order, 1) < idxOf(order, 3));
+    try std.testing.expect(idxOf(order, 2) < idxOf(order, 3));
 }
 
 test "bfs on unconnected graph visits only reachable component" {
-    const Node = struct { id: u32 };
-    var builder = graph.GraphBuilder(Node, void).init(std.testing.allocator);
-    defer builder.deinit();
-
-    const n0 = try builder.addNode(.{ .id = 0 });
-    const n1 = try builder.addNode(.{ .id = 1 });
-    const n2 = try builder.addNode(.{ .id = 2 });
-    const n3 = try builder.addNode(.{ .id = 3 });
-
-    // Component 1: 0->1
-    try builder.addEdge(n0, n1, {});
-    // Component 2: 2->3
-    try builder.addEdge(n2, n3, {});
-
-    var g = try builder.freeze(std.testing.allocator);
+    var g = try utils.buildTestGraph(std.testing.allocator, 4, &.{
+        .{ 0, 1 }, .{ 2, 3 },
+    });
     defer g.deinit(std.testing.allocator);
 
-    const order = try bfs(g, n0, std.testing.allocator);
+    const order = try bfs(g, .{ .index = 0 }, std.testing.allocator);
     defer std.testing.allocator.free(order);
 
     try std.testing.expectEqual(@as(usize, 2), order.len);
-    try std.testing.expect(order[0].index == n0.index and order[1].index == n1.index);
+    try std.testing.expect(order[0].index == 0 and order[1].index == 1);
 }
 
 test "bfs returns error on invalid start node" {
-    const Node = struct { id: u32 };
-    var builder = graph.GraphBuilder(Node, void).init(std.testing.allocator);
-    defer builder.deinit();
-
-    _ = try builder.addNode(.{ .id = 0 });
-
-    var g = try builder.freeze(std.testing.allocator);
+    var g = try utils.buildTestGraph(std.testing.allocator, 1, &.{});
     defer g.deinit(std.testing.allocator);
 
-    try std.testing.expectError(error.InvalidNode, bfs(g, graph.NodeId{ .index = 1 }, std.testing.allocator));
+    try std.testing.expectError(error.InvalidNode, bfs(g, .{ .index = 99 }, std.testing.allocator));
 }
