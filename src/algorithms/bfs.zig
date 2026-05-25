@@ -19,11 +19,11 @@ pub fn bfs(g: anytype, start: graph.NodeId, allocator: std.mem.Allocator) ![]gra
     try queue.append(allocator, start);
     try order.append(allocator, start);
 
-    var head = 0;
-    while (head < queue.items.len) {
+    var head: usize = 0;
+    while (head < queue.items.len) : (head += 1) {
         const current = queue.items[head];
-        head += 1;
-        for (g.neighbors(current)) |v| {
+        var iter = g.neighbors(current);
+        while (iter.next()) |v| {
             if (!visited.isSet(v.index)) {
                 visited.set(v.index);
                 try queue.append(allocator, v);
@@ -50,7 +50,7 @@ test "bfs order on a simple graph" {
     const order = try bfs(g, .{ .index = 0 }, std.testing.allocator);
     defer std.testing.allocator.free(order);
 
-    try std.testing.expectEqual(@as(usize, 0), order[0].index);
+    try std.testing.expectEqual(@as(u32, 0), order[0].index);
     try std.testing.expect(idxOf(order, 1) < idxOf(order, 3));
     try std.testing.expect(idxOf(order, 2) < idxOf(order, 4));
 }

@@ -23,7 +23,8 @@ pub fn dfs(g: anytype, start: graph.NodeId, allocator: std.mem.Allocator) ![]gra
 
     while (stack.items.len > 0) {
         const current = stack.pop();
-        for (g.neighbors(current)) |v| {
+        var iter = g.neighbors(current);
+        while (iter.next()) |v| {
             if (!visited.isSet(v.index)) {
                 visited.set(v.index);
                 try stack.append(allocator, v);
@@ -45,7 +46,7 @@ test "dfs visits all reachable nodes from start" {
     const order = try dfs(g, .{ .index = 0 }, std.testing.allocator);
     defer std.testing.allocator.free(order);
 
-    try std.testing.expectEqual(@as(usize, 0), order[0].index);
+    try std.testing.expectEqual(@as(u32, 0), order[0].index);
 
     var found = std.AutoArrayHashMap(usize, void).init(std.testing.allocator);
     defer found.deinit();
