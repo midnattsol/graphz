@@ -82,29 +82,29 @@ pub fn hasCycle(g: anytype, allocator: std.mem.Allocator) !bool {
 
 test "empty graph has no cycle" {
     var g = try utils.buildTestGraph(std.testing.allocator, 0, &.{});
-    defer g.deinit(std.testing.allocator);
+    defer g.deinit();
     try std.testing.expectEqual(false, try hasCycle(g, std.testing.allocator));
 }
 
 test "single node without edges has no cycle" {
     var g = try utils.buildTestGraph(std.testing.allocator, 1, &.{});
-    defer g.deinit(std.testing.allocator);
+    defer g.deinit();
     try std.testing.expectEqual(false, try hasCycle(g, std.testing.allocator));
 }
 
 test "single node with self-loop has cycle" {
-    var g = try utils.buildTestGraph(std.testing.allocator, 1, &.{.{
+    var g = try utils.buildTestGraph(std.testing.allocator, 1, &.{
         .{ 0, 0 },
-    }});
-    defer g.deinit(std.testing.allocator);
+    });
+    defer g.deinit();
     try std.testing.expectEqual(true, try hasCycle(g, std.testing.allocator));
 }
 
 test "two nodes no cycle" {
-    var g = try utils.buildTestGraph(std.testing.allocator, 2, &.{.{
+    var g = try utils.buildTestGraph(std.testing.allocator, 2, &.{
         .{ 0, 1 },
-    }});
-    defer g.deinit(std.testing.allocator);
+    });
+    defer g.deinit();
     try std.testing.expectEqual(false, try hasCycle(g, std.testing.allocator));
 }
 
@@ -112,7 +112,7 @@ test "two nodes with cycle" {
     var g = try utils.buildTestGraph(std.testing.allocator, 2, &.{
         .{ 0, 1 }, .{ 1, 0 },
     });
-    defer g.deinit(std.testing.allocator);
+    defer g.deinit();
     try std.testing.expectEqual(true, try hasCycle(g, std.testing.allocator));
 }
 
@@ -120,7 +120,7 @@ test "three nodes triangle" {
     var g = try utils.buildTestGraph(std.testing.allocator, 3, &.{
         .{ 0, 1 }, .{ 1, 2 }, .{ 2, 0 },
     });
-    defer g.deinit(std.testing.allocator);
+    defer g.deinit();
     try std.testing.expectEqual(true, try hasCycle(g, std.testing.allocator));
 }
 
@@ -128,7 +128,7 @@ test "disconnected graph, one component has cycle" {
     var g = try utils.buildTestGraph(std.testing.allocator, 4, &.{
         .{ 0, 1 }, .{ 2, 3 }, .{ 3, 2 },
     });
-    defer g.deinit(std.testing.allocator);
+    defer g.deinit();
     try std.testing.expectEqual(true, try hasCycle(g, std.testing.allocator));
 }
 
@@ -136,6 +136,6 @@ test "disconnected graph, no cycles" {
     var g = try utils.buildTestGraph(std.testing.allocator, 4, &.{
         .{ 0, 1 }, .{ 2, 3 },
     });
-    defer g.deinit(std.testing.allocator);
+    defer g.deinit();
     try std.testing.expectEqual(false, try hasCycle(g, std.testing.allocator));
 }

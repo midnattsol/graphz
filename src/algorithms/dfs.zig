@@ -41,7 +41,7 @@ test "dfs visits all reachable nodes from start" {
     var g = try utils.buildTestGraph(std.testing.allocator, 5, &.{
         .{ 0, 1 }, .{ 0, 2 }, .{ 1, 3 }, .{ 2, 4 },
     });
-    defer g.deinit(std.testing.allocator);
+    defer g.deinit();
 
     const order = try dfs(g, .{ .index = 0 }, std.testing.allocator);
     defer std.testing.allocator.free(order);
@@ -59,7 +59,7 @@ test "dfs on unconnected graph visits only reachable component" {
     var g = try utils.buildTestGraph(std.testing.allocator, 4, &.{
         .{ 0, 1 }, .{ 2, 3 },
     });
-    defer g.deinit(std.testing.allocator);
+    defer g.deinit();
 
     const order = try dfs(g, .{ .index = 0 }, std.testing.allocator);
     defer std.testing.allocator.free(order);
@@ -73,7 +73,7 @@ test "dfs on a graph with a cycle still terminates" {
     var g = try utils.buildTestGraph(std.testing.allocator, 3, &.{
         .{ 0, 1 }, .{ 1, 2 }, .{ 2, 0 },
     });
-    defer g.deinit(std.testing.allocator);
+    defer g.deinit();
 
     const order = try dfs(g, .{ .index = 0 }, std.testing.allocator);
     defer std.testing.allocator.free(order);
@@ -87,7 +87,7 @@ test "dfs on a graph with a cycle still terminates" {
 
 test "dfs returns error on invalid start node" {
     var g = try utils.buildTestGraph(std.testing.allocator, 1, &.{});
-    defer g.deinit(std.testing.allocator);
+    defer g.deinit();
 
     try std.testing.expectError(error.InvalidNode, dfs(g, .{ .index = 99 }, std.testing.allocator));
 }

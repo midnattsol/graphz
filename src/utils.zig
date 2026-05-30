@@ -14,48 +14,28 @@ pub fn requireNeighborsAndNodeCount(comptime G: type) void {
 }
 
 /// Validate that `start` refers to an existing node.
-pub fn validateNode(g: anytype, start: graph.NodeId) !void {
-    comptime requireNeighborsAndNodeCount(@TypeOf(g));
-    if (start.index >= g.nodeCount()) return error.InvalidNode;
+pub fn validateNode(graph_value: anytype, start: graph.NodeId) !void {
+    comptime requireNeighborsAndNodeCount(@TypeOf(graph_value));
+    if (start.index >= graph_value.nodeCount()) return error.InvalidNode;
 }
 
 /// Build a test graph with `node_count` nodes and the given directed edges.
 /// The edge list is interpreted at comptime so it costs nothing at runtime.
-///
-/// Pool capacities are derived from `node_count` and `edges.len` with a
-/// safety margin so that tests never hit `GraphFull`.
 pub fn buildTestGraph(
     allocator: Allocator,
     comptime node_count: u32,
     comptime edges: []const [2]u32,
 ) !graph.Graph {
-    // Safe upper bounds: worst case one block per node plus one per edge.
-    const max_blocks: u32 = @intCast(edges.len * 2 + node_count);
-    const max_runs: u32 = @intCast(node_count / 4 + 8);
-
-    const config = graph.GraphConfig{
-        .profile = .normal,
-        .max_nodes = node_count,
-        .max_blocks = max_blocks,
-        .max_rev_blocks = max_blocks,
-        .max_runs = max_runs,
-        .max_rev_runs = max_runs,
-    };
-
-    var builder = try graph.GraphBuilder.init(config, allocator);
-    defer builder.deinit(allocator);
+    var graph_instance = try graph.Graph.init(allocator);
 
     var node_ids: [node_count]graph.NodeId = undefined;
     for (0..node_count) |i| {
-        node_ids[i] = try builder.addNode();
+        node_ids[i] = try graph_instance.addNode();
     }
 
     for (edges) |e| {
-        try builder.addEdge(node_ids[e[0]], node_ids[e[1]], .{
-            .edge_type = 0,
-            .flags = 0,
-        });
+        try graph_instance.addEdge(node_ids[e[0]], node_ids[e[1]], 0, 0);
     }
 
-    return builder.freeze(allocator);
+    return graph_instance;
 }
